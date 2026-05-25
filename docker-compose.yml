@@ -1,0 +1,33 @@
+services:
+  calendaradvanced:
+    image: ${CALENDAR_IMAGE:-calendaradvanced:latest}
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${CALENDAR_HOST_PORT:-8090}:8080"
+    env_file:
+      - .env
+    environment:
+      CALENDAR_ADDR: ":8080"
+      CALENDAR_DATA_DIR: "/data"
+      CALENDAR_MIGRATIONS_DIR: "/app/migrations"
+      CALENDAR_SEEDS_DIR: "/app/seeds"
+      CALENDAR_STATIC_DIR: "/app/web"
+    volumes:
+      - calendaradvanced_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "/app/calendaradvanced", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  calendaradvanced_data:

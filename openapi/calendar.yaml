@@ -1,0 +1,438 @@
+openapi: 3.1.0
+info:
+  title: CalendarAdvanced API
+  version: 0.1.0
+  description: Public REST API contract for the self-hosted CalendarAdvanced application.
+servers:
+  - url: /api/v1
+security:
+  - cookieAuth: []
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: ck_session
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: {}
+    User:
+      type: object
+      required: [id, email, username, displayName, active, roles, twoFactorEnabled]
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string, format: email }
+        username: { type: string }
+        displayName: { type: string }
+        active: { type: boolean }
+        roles:
+          type: array
+          items: { type: string, enum: [admin, editor, viewer] }
+        twoFactorEnabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Calendar:
+      type: object
+      required: [id, ownerUserId, name, color, timezone, visible, reminderEnabled, reminderDaysBefore, reminderTime, sameDayReminderTime]
+      properties:
+        id: { type: integer, format: int64 }
+        ownerUserId: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string }
+        color: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+        timezone: { type: string }
+        visible: { type: boolean }
+        reminderEnabled: { type: boolean }
+        reminderDaysBefore: { type: integer, minimum: 0 }
+        reminderTime: { type: string }
+        sameDayReminderTime: { type: string }
+    Recurrence:
+      type: object
+      properties:
+        frequency: { type: string, enum: [DAILY, WEEKLY, MONTHLY, YEARLY] }
+        interval: { type: integer, minimum: 1 }
+        count: { type: integer, minimum: 0 }
+        until: { type: string, format: date-time }
+        byDay: { type: string }
+        rrule: { type: string }
+    Event:
+      type: object
+      required: [id, calendarId, title, startsAt, endsAt, timezone, allDay, private, completed]
+      properties:
+        id: { type: integer, format: int64 }
+        calendarId: { type: integer, format: int64 }
+        uid: { type: string }
+        title: { type: string }
+        description: { type: string }
+        location: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        timezone: { type: string }
+        allDay: { type: boolean }
+        private: { type: boolean }
+        completed: { type: boolean }
+        birthdayYear: { type: integer, minimum: 1850 }
+        status: { type: string }
+        recurrence: { $ref: '#/components/schemas/Recurrence' }
+        attendees:
+          type: array
+          items:
+            type: object
+            properties:
+              email: { type: string, format: email }
+              displayName: { type: string }
+              status: { type: string }
+        reminders:
+          type: array
+          items:
+            type: object
+            properties:
+              minutesBefore: { type: integer }
+        conflicts:
+          type: array
+          items:
+            type: object
+            properties:
+              eventId: { type: integer, format: int64 }
+              title: { type: string }
+    AuditEntry:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        actorId: { type: integer, format: int64 }
+        action: { type: string }
+        entityType: { type: string }
+        entityId: { type: string }
+        ip: { type: string }
+        userAgent: { type: string }
+        metadata: { type: string }
+        createdAt: { type: string, format: date-time }
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+paths:
+  /setup/status:
+    get:
+      security: []
+      summary: Check whether first-run setup is required.
+      responses:
+        '200':
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  required: { type: boolean }
+  /setup/admin:
+    post:
+      security: []
+      summary: Create the first administrator.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, displayName, password]
+              properties:
+                email: { type: string, format: email }
+                username: { type: string }
+                displayName: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '201':
+          description: Created admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/login:
+    post:
+      security: []
+      summary: Login with e-mail or username and optional TOTP or backup code.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, description: E-mail address or username }
+                password: { type: string, format: password }
+                totpCode: { type: string }
+                backupCode: { type: string }
+      responses:
+        '200':
+          description: Logged in
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  csrfToken: { type: string }
+                  twoFactorRequired: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+  /auth/logout:
+    post:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Revoke current session.
+      responses:
+        '200': { description: Logged out }
+  /auth/me:
+    get:
+      summary: Return current user.
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  csrfToken: { type: string }
+  /auth/password/change:
+    post:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Change password and revoke sessions.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword: { type: string, format: password }
+      responses:
+        '200': { description: Changed }
+  /auth/password/request-reset:
+    post:
+      security: []
+      summary: Request password reset.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200': { description: Reset requested }
+  /auth/password/reset:
+    post:
+      security: []
+      summary: Complete password reset.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, format: password }
+      responses:
+        '200': { description: Reset completed }
+  /security/2fa/setup:
+    post:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Create a pending TOTP secret.
+      responses:
+        '200': { description: TOTP setup data }
+  /security/2fa/enable:
+    post:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Verify TOTP and enable 2FA.
+      responses:
+        '200': { description: Backup codes returned once }
+  /security/2fa/disable:
+    post:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Disable 2FA using current password.
+      responses:
+        '200': { description: Disabled }
+  /users:
+    get:
+      summary: List users. Admin only.
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/User' }
+    post:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Create a user. Admin only.
+      responses:
+        '201': { description: User created }
+  /users/{id}/roles:
+    put:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Update user roles. Admin only.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: Roles updated }
+  /calendars:
+    get:
+      summary: List visible calendars for the current user.
+      responses:
+        '200':
+          description: Calendars
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Calendar' }
+    post:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Create calendar. Editor role required.
+      responses:
+        '201': { description: Calendar created }
+  /calendars/{id}:
+    put:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Update calendar. Editor role required.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: Calendar updated }
+    delete:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Soft delete calendar. Editor role required.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: Calendar deleted }
+  /events:
+    get:
+      summary: List events with filters and optional recurrence expansion.
+      parameters:
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to, schema: { type: string, format: date-time } }
+        - { in: query, name: calendarId, schema: { type: integer, format: int64 } }
+        - { in: query, name: q, schema: { type: string } }
+        - { in: query, name: expand, schema: { type: boolean } }
+        - { in: query, name: limit, schema: { type: integer } }
+        - { in: query, name: offset, schema: { type: integer } }
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Event' }
+    post:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Create event. Editor role required.
+      responses:
+        '201': { description: Event created }
+  /events/{id}:
+    put:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Update event. Editor role required.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: Event updated }
+    delete:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Soft delete event. Editor role required.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: Event deleted }
+  /integrations/caldav/tokens:
+    get:
+      summary: List current user's CalDAV tokens.
+      responses:
+        '200': { description: Tokens }
+    post:
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      summary: Create a CalDAV app token.
+      responses:
+        '201': { description: Token returned once }
+  /exports/csv:
+    get:
+      summary: Export events as CSV.
+      responses:
+        '200': { description: CSV file }
+  /exports/xlsx:
+    get:
+      summary: Export events as XLSX.
+      responses:
+        '200': { description: XLSX file }
+  /audit:
+    get:
+      summary: List audit log. Admin only.
+      responses:
+        '200':
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditEntry' }
+  /system/update-check:
+    get:
+      summary: Check GitHub-Releases-compatible update endpoint. Admin only.
+      responses:
+        '200': { description: Update info }
+  /system/backup:
+    get:
+      summary: Export JSON backup. Admin only.
+      responses:
+        '200': { description: Backup JSON }

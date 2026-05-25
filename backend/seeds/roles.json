@@ -1,0 +1,5 @@
+[
+  {"name":"admin","description":"System, users, integrations and global settings"},
+  {"name":"editor","description":"Create and edit calendars and events"},
+  {"name":"viewer","description":"Read calendars and events"}
+]

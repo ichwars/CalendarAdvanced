@@ -1,0 +1,3 @@
+ALTER TABLE contacts ADD COLUMN company_email TEXT NOT NULL DEFAULT '';
+ALTER TABLE contacts ADD COLUMN company_phone TEXT NOT NULL DEFAULT '';
+ALTER TABLE contacts ADD COLUMN company_mobile TEXT NOT NULL DEFAULT '';

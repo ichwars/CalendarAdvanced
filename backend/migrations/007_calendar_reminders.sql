@@ -1,0 +1,4 @@
+ALTER TABLE calendars ADD COLUMN reminder_enabled INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE calendars ADD COLUMN reminder_days_before INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE calendars ADD COLUMN reminder_time TEXT NOT NULL DEFAULT '09:00';
+ALTER TABLE calendars ADD COLUMN same_day_reminder_time TEXT NOT NULL DEFAULT '09:00';
