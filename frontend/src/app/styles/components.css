@@ -681,7 +681,63 @@
 }
 .success { color: var(--accent-2); }
 .empty { color: var(--muted); margin: 0; }
-.secret { display: block; padding: 0.75rem; border-radius: 12px; border: 1px dashed var(--border); background: var(--panel-2); }
+.secret { display: block; padding: 0.75rem; border-radius: 12px; border: 1px dashed var(--border); background: var(--panel-2); overflow-wrap: anywhere; }
+.two-factor-setup {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+}
+.two-factor-setup img,
+.two-factor-setup__qr-placeholder {
+  width: 13.75rem;
+  height: 13.75rem;
+  border: 1px solid color-mix(in srgb, var(--border), transparent 8%);
+  border-radius: 12px;
+  background: #fff;
+}
+.two-factor-setup img {
+  display: block;
+  padding: 0.55rem;
+}
+.two-factor-setup__qr-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.two-factor-uri summary {
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
+}
+.two-factor-uri .secret {
+  margin-top: 0.65rem;
+}
+.two-factor-recovery {
+  display: grid;
+  gap: 0.9rem;
+}
+.two-factor-recovery h3,
+.two-factor-recovery p {
+  margin: 0;
+}
+.two-factor-recovery p {
+  color: var(--muted);
+}
+.backup-code-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.backup-code-grid code {
+  border: 1px solid color-mix(in srgb, var(--border), transparent 18%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-2), var(--bg) 12%);
+  color: var(--text);
+  font-size: 0.92rem;
+  padding: 0.52rem 0.6rem;
+  text-align: center;
+}
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid var(--border); }
@@ -2016,6 +2072,14 @@ th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid var(--bord
   .settings-summary,
   .settings-grid--tiles {
     grid-template-columns: 1fr;
+  }
+  .two-factor-setup,
+  .backup-code-grid {
+    grid-template-columns: 1fr;
+  }
+  .two-factor-setup img,
+  .two-factor-setup__qr-placeholder {
+    width: min(13.75rem, 100%);
   }
   .overview-metrics {
     grid-template-columns: 1fr;
