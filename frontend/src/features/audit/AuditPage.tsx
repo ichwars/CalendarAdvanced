@@ -16,7 +16,7 @@ export function AuditPage() {
   return (
     <div className="page">
       <header className="page-header"><h1>{t('audit.title')}</h1></header>
-      <Card>
+      <Card unfinished>
         {!items.length ? <EmptyState message={t('common.empty')} /> : (
           <div className="table-wrap">
             <table>

@@ -54,7 +54,7 @@ export function UsersPage() {
   return (
     <div className="page">
       <header className="page-header"><h1>{t('users.title')}</h1></header>
-      <Card>
+      <Card unfinished>
         <form className="grid-form" onSubmit={(event) => void submit(event)}>
           {error && <p className="error" role="alert">{error}</p>}
           <FormField label={t('common.email')} name="email" type="email" value={email} onChange={(event) => setEmail(event.currentTarget.value)} required />
@@ -69,7 +69,7 @@ export function UsersPage() {
       {!users.length ? <EmptyState message={t('common.empty')} /> : (
         <div className="cards-list">
           {users.map((user) => (
-            <Card key={user.id}>
+            <Card unfinished key={user.id}>
               <article className="event-row">
                 <div>
                   <h2>{user.displayName}</h2>

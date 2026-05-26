@@ -54,7 +54,7 @@ export function SecurityPage({ user, onUserChange }: { user: User; onUserChange:
             <Button type="submit">{t('common.save')}</Button>
           </form>
         </Card>
-        <Card>
+        <Card unfinished>
           <div className="stack">
             <h2>{t('security.twoFactor')}</h2>
             {message && <p className="success">{message}</p>}
