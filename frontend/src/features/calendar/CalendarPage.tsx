@@ -10,6 +10,7 @@ import { FormField } from '../../shared/components/FormField';
 import { Icon, type IconName } from '../../shared/components/Icon';
 import { RichTextField } from '../../shared/components/RichTextField';
 import { SelectField } from '../../shared/components/SelectField';
+import { addDaysToKey, dateFromKey, dateKeyInTimeZone, formatDateKeyLabel } from '../../shared/dates';
 import { formatDateKey, getCalendarHolidaysInRange, getHolidayRegionLabel, type Holiday } from '../../shared/holidays';
 import { useI18n } from '../../shared/i18n';
 import { getGeneralPreferences, type CalendarDensityPreference, type GeneralPreferences, type WeekStartPreference } from '../../shared/preferences';
@@ -205,7 +206,7 @@ export function CalendarPage() {
       </div>
 
       {view === 'agenda' ? (
-        <Agenda calendars={calendars} events={events} onOpenEvent={setDetailEvent} tasks={calendarTasks} />
+        <Agenda calendars={calendars} events={events} locale={locale} onOpenEvent={setDetailEvent} tasks={calendarTasks} />
       ) : view === 'day' || view === 'week' ? (
         <TimeGridCalendar
           calendars={calendars}
@@ -639,7 +640,7 @@ function TimeGridCalendar({
       <div className="time-calendar__all-day" style={fixedGridStyle}>
         <div className="time-calendar__all-day-label">{t('events.allDay')}</div>
         {days.map((day) => {
-          const dayEvents = events.filter((event) => event.allDay && isSameDay(new Date(event.startsAt), day));
+          const dayEvents = events.filter((event) => event.allDay && eventStartDateKey(event) === formatDateKey(day));
           const dayTasks = tasks.filter((task) => task.dueAt && isSameDay(new Date(task.dueAt), day) && isAllDayTask(task));
           const dayHolidays = holidays.filter((holiday) => holiday.date === formatDateKey(day));
           const allDaySelected = selectedAllDayRange ? day >= selectedAllDayRange.start && day < selectedAllDayRange.end : false;
@@ -946,7 +947,7 @@ function CalendarTable({
         >
           <div className="week-number" aria-label={`Kalenderwoche ${row.weekNumber}`}>{row.weekNumber}</div>
           {row.days.map((cell) => {
-            const dayEvents = events.filter((event) => isSameDay(new Date(event.startsAt), cell));
+            const dayEvents = events.filter((event) => eventDateMatchesDay(event, cell));
             const dayTasks = tasks.filter((task) => task.dueAt && isSameDay(new Date(task.dueAt), cell));
             const dayHolidays = holidays.filter((holiday) => holiday.date === formatDateKey(cell));
             const isMuted = cell.getMonth() !== month;
@@ -993,10 +994,10 @@ function CalendarTable({
   );
 }
 
-function Agenda({ calendars, events, onOpenEvent, tasks }: { calendars: Calendar[]; events: EventItem[]; onOpenEvent: (event: EventItem) => void; tasks: TaskItem[] }) {
+function Agenda({ calendars, events, locale, onOpenEvent, tasks }: { calendars: Calendar[]; events: EventItem[]; locale: string; onOpenEvent: (event: EventItem) => void; tasks: TaskItem[] }) {
   const { t } = useI18n();
   const items = [
-    ...events.map((event) => ({ date: new Date(event.startsAt), event, kind: 'event' as const })),
+    ...events.map((event) => ({ date: event.allDay ? dateFromKey(eventStartDateKey(event)) : new Date(event.startsAt), event, kind: 'event' as const })),
     ...tasks.filter((task) => task.dueAt).map((task) => ({ date: new Date(task.dueAt as string), task, kind: 'task' as const }))
   ].sort((left, right) => left.date.getTime() - right.date.getTime());
   if (!items.length) {
@@ -1038,7 +1039,7 @@ function Agenda({ calendars, events, onOpenEvent, tasks }: { calendars: Calendar
                 <strong>{event.title}</strong>
                 <p>{event.location}</p>
               </div>
-              <time>{event.allDay ? new Date(event.startsAt).toLocaleDateString() : new Date(event.startsAt).toLocaleString()}</time>
+              <time>{event.allDay ? formatDateKeyLabel(eventStartDateKey(event), locale) : new Date(event.startsAt).toLocaleString()}</time>
             </article>
           );
         })}
@@ -1253,12 +1254,13 @@ function formatDetailTime(event: EventItem, locale: string): string {
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
   if (event.allDay) {
-    const endDay = end.getTime() > start.getTime() ? addDays(startOfDay(end), -1) : start;
-    const lastVisibleDay = endDay.getTime() >= startOfDay(start).getTime() ? endDay : start;
-    if (isSameDay(start, lastVisibleDay)) {
-      return start.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+    const startKey = eventStartDateKey(event);
+    const endKey = eventEndDateKey(event);
+    const lastVisibleKey = endKey && endKey !== startKey ? addDaysToKey(endKey, -1) : startKey;
+    if (!lastVisibleKey || startKey === lastVisibleKey) {
+      return formatDateKeyLabel(startKey, locale, { day: 'numeric', month: 'long', year: 'numeric' });
     }
-    return `${start.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })} - ${lastVisibleDay.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    return `${formatDateKeyLabel(startKey, locale, { day: 'numeric', month: 'long', year: 'numeric' })} - ${formatDateKeyLabel(lastVisibleKey, locale, { day: 'numeric', month: 'long', year: 'numeric' })}`;
   }
   return `${start.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}, ${start.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}, ${end.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`;
 }
@@ -1300,7 +1302,8 @@ function getBirthdayAge(event: EventItem, calendar?: Calendar): number | null {
   if (!event.birthdayYear || !isBirthdayContext(event.title, calendar)) {
     return null;
   }
-  const age = new Date(event.startsAt).getFullYear() - event.birthdayYear;
+  const eventYear = event.allDay ? dateFromKey(eventStartDateKey(event)).getFullYear() : new Date(event.startsAt).getFullYear();
+  const age = eventYear - event.birthdayYear;
   return age > 0 && age < 150 ? age : null;
 }
 
@@ -1315,6 +1318,21 @@ function isSameDay(a: Date, b: Date): boolean {
 function isWeekend(date: Date): boolean {
   const day = date.getDay();
   return day === 0 || day === 6;
+}
+
+function eventDateMatchesDay(event: EventItem, day: Date): boolean {
+  if (event.allDay) {
+    return eventStartDateKey(event) === formatDateKey(day);
+  }
+  return isSameDay(new Date(event.startsAt), day);
+}
+
+function eventStartDateKey(event: EventItem): string {
+  return dateKeyInTimeZone(event.startsAt, event.timezone);
+}
+
+function eventEndDateKey(event: EventItem): string {
+  return dateKeyInTimeZone(event.endsAt, event.timezone);
 }
 
 export function defaultEventDates() {

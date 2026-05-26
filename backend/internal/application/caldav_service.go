@@ -1423,8 +1423,8 @@ func calendarEventData(event domain.Event) string {
 	b.WriteString("UID:" + escapeDAVText(event.UID) + "\r\n")
 	b.WriteString("DTSTAMP:" + formatDAVDateTime(time.Now().UTC()) + "\r\n")
 	if event.AllDay {
-		b.WriteString("DTSTART;VALUE=DATE:" + event.StartsAt.Format("20060102") + "\r\n")
-		b.WriteString("DTEND;VALUE=DATE:" + event.EndsAt.Format("20060102") + "\r\n")
+		b.WriteString("DTSTART;VALUE=DATE:" + formatDAVAllDayDate(event.StartsAt, event.Timezone) + "\r\n")
+		b.WriteString("DTEND;VALUE=DATE:" + formatDAVAllDayDate(event.EndsAt, event.Timezone) + "\r\n")
 	} else {
 		b.WriteString("DTSTART:" + formatDAVDateTime(event.StartsAt.UTC()) + "\r\n")
 		b.WriteString("DTEND:" + formatDAVDateTime(event.EndsAt.UTC()) + "\r\n")
@@ -1544,6 +1544,16 @@ func davTaskPriority(priority domain.TaskPriority) string {
 
 func formatDAVDateTime(value time.Time) string {
 	return value.UTC().Format("20060102T150405Z")
+}
+
+func formatDAVAllDayDate(value time.Time, timezone string) string {
+	location := time.Local
+	if timezone != "" {
+		if loaded, err := time.LoadLocation(timezone); err == nil {
+			location = loaded
+		}
+	}
+	return value.In(location).Format("20060102")
 }
 
 func escapeDAVText(value string) string {

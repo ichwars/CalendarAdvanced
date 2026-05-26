@@ -5,6 +5,7 @@ import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { EmptyState } from '../../shared/components/EmptyState';
 import { Icon } from '../../shared/components/Icon';
 import { SelectField } from '../../shared/components/SelectField';
+import { addDaysToKey, dateKeyInTimeZone, formatDateKeyLabel } from '../../shared/dates';
 import { useI18n } from '../../shared/i18n';
 import { getGeneralPreferences } from '../../shared/preferences';
 import type { Calendar, EventItem } from '../../shared/types';
@@ -183,7 +184,7 @@ export function EventsPage() {
                       </div>
                     </td>
                     <td>{calendar?.name ?? '-'}</td>
-                    <td>{formatEventDate(event.startsAt, event.allDay, locale)}</td>
+                    <td>{formatEventDate(event.startsAt, event.allDay, locale, event.timezone)}</td>
                     <td>{formatEventEndDate(event, locale)}</td>
                     <td>{event.location || '-'}</td>
                     <td><EventStatus event={event} /></td>
@@ -303,17 +304,20 @@ function applyRangeFilter(params: URLSearchParams, rangeFilter: RangeFilter): vo
   }
 }
 
-function formatEventDate(value: string, allDay: boolean, locale: string): string {
+function formatEventDate(value: string, allDay: boolean, locale: string, timezone?: string): string {
   const date = new Date(value);
   if (allDay) {
-    return date.toLocaleDateString(locale);
+    return formatDateKeyLabel(dateKeyInTimeZone(value, timezone), locale);
   }
   return date.toLocaleString(locale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatEventEndDate(event: EventItem, locale: string): string {
   if (event.allDay) {
-    return '-';
+    const startKey = dateKeyInTimeZone(event.startsAt, event.timezone);
+    const endKey = dateKeyInTimeZone(event.endsAt, event.timezone);
+    const lastVisibleKey = endKey && endKey !== startKey ? addDaysToKey(endKey, -1) : startKey;
+    return lastVisibleKey && lastVisibleKey !== startKey ? formatDateKeyLabel(lastVisibleKey, locale) : '-';
   }
-  return formatEventDate(event.endsAt, false, locale);
+  return formatEventDate(event.endsAt, false, locale, event.timezone);
 }
