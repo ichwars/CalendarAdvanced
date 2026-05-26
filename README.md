@@ -28,7 +28,7 @@ Open `http://localhost:8090`. On first start, CalendarAdvanced opens the setup s
 For a small private server, clone the repository, copy `.env.example` to `.env`, adjust the public URL and start the service:
 
 ```bash
-git clone https://github.com/droth/CalendarAdvanced.git
+git clone https://github.com/ichwars/CalendarAdvanced.git
 cd CalendarAdvanced
 cp .env.example .env
 docker compose up -d --build

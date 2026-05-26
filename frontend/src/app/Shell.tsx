@@ -23,7 +23,7 @@ import packageJson from '../../package.json';
 
 const appVersion = `v${packageJson.version}`;
 const sidebarCollapsedKey = 'calendaradvanced.sidebarCollapsed';
-const githubUrl = import.meta.env.VITE_GITHUB_URL || 'https://github.com/droth/CalendarAdvanced';
+const githubUrl = import.meta.env.VITE_GITHUB_URL || 'https://github.com/ichwars/CalendarAdvanced';
 const routeIcons: Record<string, IconName> = {
   overview: 'layout',
   calendar: 'calendar',
