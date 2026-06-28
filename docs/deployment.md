@@ -29,8 +29,8 @@ Open `http://localhost:8090` and complete first-run setup.
 CalendarAdvanced does not modify its own container. Update with:
 
 ```bash
-docker compose pull
-docker compose up -d
+git pull
+docker compose up -d --build
 ```
 
 If building from source:

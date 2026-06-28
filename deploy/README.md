@@ -3,8 +3,17 @@
 The default deployment target is Docker Compose with a persistent `/data` volume.
 
 ```bash
-cp .env.example .env
 docker compose up -d --build
+```
+
+The `.env` file is optional. Create one from `.env.example` when you want to override production settings such as `CALENDAR_PUBLIC_URL`, `CALENDAR_COOKIE_SECURE`, SMTP or a stable `CALENDAR_TOKEN_ENCRYPTION_KEY`.
+
+For source deployments, build the image from the Dockerfile:
+
+```bash
+git pull --ff-only
+docker compose build --pull
+docker compose up -d --remove-orphans
 ```
 
 The runtime container is intentionally hardened:

@@ -1,18 +1,29 @@
 services:
   calendaradvanced:
-    image: ${CALENDAR_IMAGE:-calendaradvanced:latest}
-    build: .
+    build:
+      context: .
+    pull_policy: build
     restart: unless-stopped
     ports:
       - "${CALENDAR_HOST_PORT:-8090}:8080"
-    env_file:
-      - .env
     environment:
       CALENDAR_ADDR: ":8080"
       CALENDAR_DATA_DIR: "/data"
       CALENDAR_MIGRATIONS_DIR: "/app/migrations"
       CALENDAR_SEEDS_DIR: "/app/seeds"
       CALENDAR_STATIC_DIR: "/app/web"
+      CALENDAR_PUBLIC_URL: "${CALENDAR_PUBLIC_URL:-http://localhost:8090}"
+      CALENDAR_COOKIE_SECURE: "${CALENDAR_COOKIE_SECURE:-false}"
+      CALENDAR_SESSION_DAYS: "${CALENDAR_SESSION_DAYS:-14}"
+      CALENDAR_UPDATE_CHECK_URL: "${CALENDAR_UPDATE_CHECK_URL:-https://api.github.com/repos/ichwars/CalendarAdvanced/releases/latest}"
+      CALENDAR_TOKEN_ENCRYPTION_KEY: "${CALENDAR_TOKEN_ENCRYPTION_KEY:-}"
+      CALENDAR_SMTP_HOST: "${CALENDAR_SMTP_HOST:-}"
+      CALENDAR_SMTP_PORT: "${CALENDAR_SMTP_PORT:-587}"
+      CALENDAR_SMTP_USER: "${CALENDAR_SMTP_USER:-}"
+      CALENDAR_SMTP_PASSWORD: "${CALENDAR_SMTP_PASSWORD:-}"
+      CALENDAR_SMTP_FROM: "${CALENDAR_SMTP_FROM:-}"
+      CALENDAR_SMTP_STARTTLS: "${CALENDAR_SMTP_STARTTLS:-true}"
+      CALENDAR_LOCAL_RESET_TOKENS: "${CALENDAR_LOCAL_RESET_TOKENS:-false}"
     volumes:
       - calendaradvanced_data:/data
     read_only: true

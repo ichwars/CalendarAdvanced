@@ -10,6 +10,11 @@ backend/internal/application/data
 # Build output
 /dist
 /frontend/dist
+/mobile/.dart_tool
+/mobile/.flutter-plugins
+/mobile/.flutter-plugins-dependencies
+/mobile/build
+/mobile/coverage
 /bin
 /tmp
 

@@ -13,11 +13,11 @@ CalendarAdvanced is a self-hosted, local-first calendar web application for priv
 - Calendars, events, recurring events, attendees, reminders, invitations, local exports and free/busy/conflict data.
 - CalDAV/DAVx⁵ adapter under `/dav/` and `/.well-known/caldav` with separate revocable CalDAV tokens.
 - Dark theme by default with German and English UI translations.
+- Flutter mobile client foundation in `mobile/` for Android first and later iOS.
 
 ## Quick start
 
 ```bash
-cp .env.example .env
 docker compose up -d --build
 ```
 
@@ -25,7 +25,7 @@ Open `http://localhost:8090`. On first start, CalendarAdvanced opens the setup s
 
 ## Docker Compose installation
 
-For a small private server, clone the repository, copy `.env.example` to `.env`, adjust the public URL and start the service:
+For a small private server, clone the repository and start the service. Create `.env` from `.env.example` when you want to override production settings:
 
 ```bash
 git clone https://github.com/ichwars/CalendarAdvanced.git
@@ -72,6 +72,17 @@ npm ci
 npm run dev
 ```
 
+Mobile app:
+
+```bash
+cd mobile
+flutter pub get
+flutter create --platforms=android,ios .
+flutter run
+```
+
+The mobile client currently targets the JSON API and uses secure local storage for the server URL, session cookie and CSRF token. See `docs/mobile.md` for the mobile roadmap.
+
 Production frontend build:
 
 ```bash
@@ -98,8 +109,8 @@ CALENDAR_COOKIE_SECURE=false
 CalendarAdvanced does not self-modify containers. The admin update screen checks a GitHub-Releases-compatible endpoint and shows the current version, available version, release notes and release URL. Update with:
 
 ```bash
-docker compose pull
-docker compose up -d
+git pull
+docker compose up -d --build
 ```
 
 Database migrations run on application start.
