@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -10,7 +12,6 @@ Future<void> main() async {
   await initializeDateFormatting('de');
 
   final state = AppState(api: ApiClient());
-  await state.restoreSession();
-
   runApp(CalendarAdvancedApp(state: state));
+  unawaited(state.restoreSession());
 }

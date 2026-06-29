@@ -710,9 +710,14 @@ function TimeGridCalendar({
                 .filter((event) => !event.allDay && isSameDay(new Date(event.startsAt), day))
                 .map((event) => {
                   const position = getEventGridPosition(event, slotStep);
+                  const eventClasses = [
+                    'time-calendar__event',
+                    event.completed ? 'time-calendar__event--completed' : '',
+                    position.span <= 1 ? 'time-calendar__event--short' : ''
+                  ].filter(Boolean).join(' ');
                   return (
                   <article
-                    className={event.completed ? 'time-calendar__event time-calendar__event--completed' : 'time-calendar__event'}
+                    className={eventClasses}
                     draggable
                     key={`${event.id}-${event.startsAt}`}
                     onClick={() => onOpenEvent(event)}
@@ -741,9 +746,15 @@ function TimeGridCalendar({
                 .filter((task) => task.dueAt && !isAllDayTask(task) && isSameDay(new Date(task.dueAt), day))
                 .map((task) => {
                   const position = getTaskGridPosition(task, slotStep);
+                  const taskClasses = [
+                    'time-calendar__event',
+                    'time-calendar__event--task',
+                    task.completed ? 'time-calendar__event--completed' : '',
+                    position.span <= 1 ? 'time-calendar__event--short' : ''
+                  ].filter(Boolean).join(' ');
                   return (
                     <article
-                      className={task.completed ? 'time-calendar__event time-calendar__event--task time-calendar__event--completed' : 'time-calendar__event time-calendar__event--task'}
+                      className={taskClasses}
                       key={`task-${task.id}`}
                       style={{
                         borderColor: 'var(--accent-2)',

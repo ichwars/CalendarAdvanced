@@ -15,6 +15,7 @@ import (
 const maxExcelImportBytes = 20 * 1024 * 1024
 
 var sheetYearPattern = regexp.MustCompile(`\b(19|20)\d{2}\b`)
+var montageWeekPattern = regexp.MustCompile(`(?i)\bkw\s*(\d{1,2})\b`)
 
 func MaxExcelImportBytes() int64 {
 	return maxExcelImportBytes
@@ -60,6 +61,7 @@ type ExcelImportOptions struct {
 	AllDay        bool
 	CalendarID    int64
 	EmployeeQuery string
+	SourceName    string
 	Timezone      string
 	WorkEnd       string
 	WorkStart     string
@@ -73,12 +75,13 @@ type excelTask struct {
 	Row      int
 	Sheet    string
 	Status   string
+	Summary  string
 	Week     int
 	Weekday  string
 }
 
-func (s *ExcelImportService) Preview(data []byte, timezone, employeeQuery string) (ExcelImportPreview, error) {
-	tasks, warnings, err := parseExcelTasks(data, timezone)
+func (s *ExcelImportService) Preview(data []byte, timezone, employeeQuery, sourceName string) (ExcelImportPreview, error) {
+	tasks, warnings, err := parseExcelTasks(data, timezone, sourceName)
 	if err != nil {
 		return ExcelImportPreview{}, NewError("invalid_excel_import", err.Error(), nil)
 	}
@@ -101,7 +104,7 @@ func (s *ExcelImportService) Import(data []byte, options ExcelImportOptions, use
 	if err != nil {
 		return ExcelImportResult{}, err
 	}
-	tasks, warnings, err := parseExcelTasks(data, options.Timezone)
+	tasks, warnings, err := parseExcelTasks(data, options.Timezone, options.SourceName)
 	if err != nil {
 		return ExcelImportResult{}, NewError("invalid_excel_import", err.Error(), nil)
 	}
@@ -193,7 +196,7 @@ func filterExcelTasks(tasks []excelTask, employeeQuery string) ([]excelTask, err
 	return filtered, nil
 }
 
-func parseExcelTasks(data []byte, timezone string) ([]excelTask, []string, error) {
+func parseExcelTasks(data []byte, timezone, sourceName string) ([]excelTask, []string, error) {
 	if len(data) == 0 {
 		return nil, nil, fmt.Errorf("file is empty")
 	}
@@ -207,6 +210,12 @@ func parseExcelTasks(data []byte, timezone string) ([]excelTask, []string, error
 	location, err := time.LoadLocation(normalizeTimezone("", timezone))
 	if err != nil {
 		return nil, nil, err
+	}
+	if tasks, warnings, ok := parseMontagePlanningTasks(workbook, location, sourceName); ok {
+		if len(tasks) == 0 {
+			return nil, warnings, fmt.Errorf("no importable tasks found")
+		}
+		return tasks, warnings, nil
 	}
 	var tasks []excelTask
 	warnings := []string{}
@@ -245,6 +254,60 @@ func parseExcelTasks(data []byte, timezone string) ([]excelTask, []string, error
 		return nil, warnings, fmt.Errorf("no importable tasks found")
 	}
 	return tasks, warnings, nil
+}
+
+func parseMontagePlanningTasks(workbook xlsx.Workbook, location *time.Location, sourceName string) ([]excelTask, []string, bool) {
+	var sheet *xlsx.Sheet
+	for index := range workbook.Sheets {
+		if strings.EqualFold(strings.TrimSpace(workbook.Sheets[index].Name), "PROJALLG") {
+			sheet = &workbook.Sheets[index]
+			break
+		}
+	}
+	if sheet == nil || !looksLikeMontagePlanningSheet(*sheet) {
+		return nil, nil, false
+	}
+	week, ok := montagePlanningWeek(*sheet, sourceName)
+	warnings := []string{}
+	if !ok {
+		return nil, []string{"PROJALLG: Kalenderwoche nicht erkannt"}, true
+	}
+	year := montagePlanningYear(week, time.Now().In(location))
+	tasks := []excelTask{}
+	for _, row := range sheet.Rows {
+		if row.Index <= 2 {
+			continue
+		}
+		employee := cell(row.Cells, 0)
+		project := cell(row.Cells, 1)
+		title := cell(row.Cells, 2)
+		if employee == "" && project == "" && title == "" {
+			continue
+		}
+		for offset, column := range []int{3, 4, 5, 6, 7, 8, 9} {
+			marker := strings.TrimSpace(cell(row.Cells, column))
+			if marker == "" {
+				continue
+			}
+			date, err := isoWeekdayDate(year, week, offset, location)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("PROJALLG Zeile %d: KW %d ist ungültig", row.Index, week))
+				continue
+			}
+			tasks = append(tasks, excelTask{
+				Date:     date,
+				Employee: employee,
+				Pop:      project,
+				Row:      row.Index,
+				Sheet:    sheet.Name,
+				Status:   "open",
+				Summary:  title,
+				Week:     week,
+				Weekday:  weekdayName(offset),
+			})
+		}
+	}
+	return tasks, warnings, true
 }
 
 func excelPreviewFromTasks(tasks []excelTask, warnings []string) ExcelImportPreview {
@@ -286,6 +349,9 @@ func excelTaskTimeRange(date time.Time, options ExcelImportOptions) (time.Time, 
 }
 
 func excelTaskTitle(task excelTask) string {
+	if task.Summary != "" {
+		return task.Summary
+	}
 	parts := []string{}
 	if task.Pop != "" {
 		parts = append(parts, task.Pop)
@@ -305,6 +371,12 @@ func excelTaskDescription(task excelTask) string {
 		fmt.Sprintf("KW: %d", task.Week),
 		fmt.Sprintf("Wochentag: %s", task.Weekday),
 		fmt.Sprintf("Quelle: %s, Zeile %d", task.Sheet, task.Row),
+	}
+	if task.Summary != "" {
+		lines = append([]string{
+			fmt.Sprintf("Bezeichnung / Kunde: %s", task.Summary),
+			fmt.Sprintf("Projekt Nr.: %s", valueOrDash(task.Pop)),
+		}, lines...)
 	}
 	if task.Status != "" {
 		lines = append(lines, fmt.Sprintf("Status: %s", task.Status))
@@ -362,7 +434,7 @@ func excelTaskCompleted(task excelTask) bool {
 }
 
 func excelTaskUID(task excelTask) string {
-	raw := fmt.Sprintf("%s-%d-%d-%s-%s-%s", task.Sheet, task.Row, task.Week, task.Weekday, task.Pop, task.Location)
+	raw := fmt.Sprintf("%s-%d-%d-%s-%s-%s-%s", task.Sheet, task.Row, task.Week, task.Weekday, task.Pop, task.Location, task.Summary)
 	raw = strings.ToLower(strings.TrimSpace(raw))
 	replacer := strings.NewReplacer(" ", "-", "·", "-", "/", "-", "\\", "-", ":", "-", ";", "-", "@", "-")
 	return "excel-" + replacer.Replace(raw) + "@calendaradvanced"
@@ -406,7 +478,50 @@ func isMarked(value string) bool {
 }
 
 func weekdayName(offset int) string {
-	return []string{"Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"}[offset]
+	return []string{"Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"}[offset]
+}
+
+func looksLikeMontagePlanningSheet(sheet xlsx.Sheet) bool {
+	for _, row := range sheet.Rows {
+		if row.Index != 2 {
+			continue
+		}
+		return strings.EqualFold(cell(row.Cells, 0), "Mitarbeiter") &&
+			strings.EqualFold(cell(row.Cells, 1), "Projekt Nr.") &&
+			strings.Contains(strings.ToLower(cell(row.Cells, 2)), "bezeichnung")
+	}
+	return false
+}
+
+func montagePlanningWeek(sheet xlsx.Sheet, sourceName string) (int, bool) {
+	if week, ok := weekFromFilename(sourceName); ok {
+		return week, true
+	}
+	for _, row := range sheet.Rows {
+		if row.Index == 1 && strings.EqualFold(cell(row.Cells, 0), "KW") {
+			return weekFromCell(cell(row.Cells, 1))
+		}
+	}
+	return 0, false
+}
+
+func weekFromFilename(sourceName string) (int, bool) {
+	match := montageWeekPattern.FindStringSubmatch(sourceName)
+	if len(match) != 2 {
+		return 0, false
+	}
+	return weekFromCell(match[1])
+}
+
+func montagePlanningYear(week int, now time.Time) int {
+	year, currentWeek := now.ISOWeek()
+	if currentWeek <= 4 && week >= 50 {
+		return year - 1
+	}
+	if currentWeek >= 50 && week <= 4 {
+		return year + 1
+	}
+	return year
 }
 
 func cell(cells []string, index int) string {

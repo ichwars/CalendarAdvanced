@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -169,14 +170,29 @@ class ApiClient {
       if (includeAuth && _csrfToken != null) 'X-CSRF-Token': _csrfToken!,
     };
     final encodedBody = body == null ? null : jsonEncode(body);
-    final response = switch (method) {
-      'GET' => await http.get(uri, headers: headers),
-      'POST' => await http.post(uri, headers: headers, body: encodedBody),
-      'PUT' => await http.put(uri, headers: headers, body: encodedBody),
-      'DELETE' => await http.delete(uri, headers: headers),
+    final Future<http.Response> request = switch (method) {
+      'GET' => http.get(uri, headers: headers),
+      'POST' => http.post(uri, headers: headers, body: encodedBody),
+      'PUT' => http.put(uri, headers: headers, body: encodedBody),
+      'DELETE' => http.delete(uri, headers: headers),
       _ => throw const ApiException(
           'unsupported_method', 'Nicht unterstuetzte Methode.'),
     };
+
+    late final http.Response response;
+    try {
+      response = await request.timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const ApiException(
+        'network_timeout',
+        'Der Server antwortet nicht. Bitte Server-URL und Erreichbarkeit pruefen.',
+      );
+    } on http.ClientException {
+      throw const ApiException(
+        'network_error',
+        'Der Server ist nicht erreichbar. Bitte Server-URL und Netzwerk pruefen.',
+      );
+    }
 
     await _captureCookies(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -277,3 +293,4 @@ int _sortTasks(TaskItem a, TaskItem b) {
 const _serverUrlKey = 'calendaradvanced.server_url';
 const _sessionCookieKey = 'calendaradvanced.session_cookie';
 const _csrfTokenKey = 'calendaradvanced.csrf_token';
+const _requestTimeout = Duration(seconds: 10);

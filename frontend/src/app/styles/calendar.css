@@ -495,6 +495,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.time-calendar__event--short {
+  align-content: center;
+  gap: 0;
+  padding-top: 0.22rem;
+  padding-bottom: 0.22rem;
+}
+.time-calendar__event--short strong {
+  font-size: 0.73rem;
+  line-height: 1.05;
+}
+.time-calendar__event--short small {
+  display: none;
+}
 .time-calendar--density-dense .time-calendar__event {
   margin: 0.08rem 0.2rem;
   padding: 0.26rem 2.45rem 0.26rem 0.34rem;

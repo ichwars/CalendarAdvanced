@@ -23,7 +23,7 @@ func TestParseExcelTasksUsesSheetYearWeekColumnAndWeekdayMarkers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tasks, warnings, err := parseExcelTasks(data, "Europe/Berlin")
+	tasks, warnings, err := parseExcelTasks(data, "Europe/Berlin", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestExcelImportEmployeeFilterUsesColumnP(t *testing.T) {
 	}
 
 	service := &ExcelImportService{}
-	preview, err := service.Preview(data, "Europe/Berlin", "mara")
+	preview, err := service.Preview(data, "Europe/Berlin", "mara", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,6 +148,35 @@ func TestExcelImportEmployeeFilterUsesColumnP(t *testing.T) {
 	}
 	if preview.Samples[0].Employee != "Mara K." || preview.Samples[0].Pop != "ber-101" {
 		t.Fatalf("unexpected filtered sample: %+v", preview.Samples[0])
+	}
+}
+
+func TestMontagePlanningImportUsesProjAllgEmployeeColumnAndSeparateProjects(t *testing.T) {
+	rows := [][]string{
+		{"KW", "27"},
+		{"Mitarbeiter", "Projekt Nr.", "Bezeichnung / Kunde", "Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"},
+		{"Rothe, Daniel", "26285013", "WLAN Verkabelung ENB Haus I", "x", "x", "", "", "", "", ""},
+		{"Rothe, Daniel", "25224019", "Städt. Klinikum DE DECT-System", "x", "x", "", "", "", "", ""},
+		{"Andere, Person", "999", "Nicht importieren", "x", "", "", "", "", "", ""},
+	}
+	data, err := excel.BuildSimpleXLSX("PROJALLG", rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	service := &ExcelImportService{}
+	preview, err := service.Preview(data, "Europe/Berlin", "Rothe, Daniel", "Montageplanung KW27.xlsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.EventCount != 4 || preview.Rows != 2 {
+		t.Fatalf("preview = %+v", preview)
+	}
+	if preview.Samples[0].Title != "WLAN Verkabelung ENB Haus I" || preview.Samples[0].Pop != "26285013" {
+		t.Fatalf("unexpected first sample: %+v", preview.Samples[0])
+	}
+	if preview.Samples[1].Title != "WLAN Verkabelung ENB Haus I" || preview.Samples[2].Title != "Städt. Klinikum DE DECT-System" {
+		t.Fatalf("expected separate appointments per project/day, got %+v", preview.Samples)
 	}
 }
 
